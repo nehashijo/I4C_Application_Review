@@ -11,13 +11,14 @@ from pydrive.auth import GoogleAuth
 from pydrive.drive import GoogleDrive
 
 from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
+from google.oauth2.credentials import Credentials as Credentials
+from google.oauth2.service_account import Credentials as ServiceAccount
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
-SPREADSHEET_ID = '1TnwuYCViBkKxFFkockuDx7Dp9fe-GZp0cfvEQs3mFD4'
+SPREADSHEET_ID = '19kUzb56vlaqxvv8cBoqweLhaNHHWMK_knTl0spt21Q8'
 APPLICANT_RANGE = 'Input (Raw Data)'
 QUESTION_RANGE = 'Questions!A:B'
 INDICATOR_RANGE = "Indicators!"
@@ -25,7 +26,9 @@ GRADE_RANGE = "Grades"
 
 
 # User must update this variable with path to json file
-path = 'path/to/file.json'
+# path = 'path/to/file.json'
+path = 'i4c-automation-ddbaa5c8fcdd.json'
+
 
 # Update the cell numbers here from the Indicators Tab
 gender_cells = "A19:B24"
@@ -72,6 +75,7 @@ def main():
     """Shows basic usage of the Sheets API.
     Prints values from a sample spreadsheet.
     """
+    print("Step 1: Attempting to connect to spreadsheet using Google Auth to read in applicant data.")
     creds = None
     # The file token.json stores the user's access and refresh tokens, and is
     # created automatically when the authorization flow completes for the first
@@ -95,8 +99,18 @@ def main():
 
         # Call the Sheets API
         sheet = service.spreadsheets()
+
+        print("Step 1: Successfully completed.")
+        print("Step 2: Attempting to process raw data into final dataframe. This may take some time.")
         
-        process_data(sheet)
+        dataframe = process_data(sheet)
+
+        print("Step 2: Successfully completed")
+        print("Step 3: Attempting to export the final dataframe into the 'Output' tab of the I4C Application Review Tool spreadsheet.")
+
+        export_to_sheet(dataframe)
+
+        print("Step 3: Successfully completed. You should be able to view the final data in the spreadsheet now.")
 
     except HttpError as err:
         print(err)
@@ -119,7 +133,7 @@ def export_to_sheet(df):
     scopes = ['https://www.googleapis.com/auth/spreadsheets',
             'https://www.googleapis.com/auth/drive']
 
-    credentials = Credentials.from_service_account_file(path, scopes=scopes)
+    credentials = ServiceAccount.from_service_account_file(path, scopes=scopes)
 
     gc = gspread.authorize(credentials)
 
@@ -135,6 +149,8 @@ def export_to_sheet(df):
     # worksheet1.clear()
     set_with_dataframe(worksheet=worksheet1, dataframe=df, include_index=False,
     include_column_header=True, resize=True)
+
+    return
 
 def process_data(sheet):
     applicant_data = import_from_sheet(sheet, APPLICANT_RANGE, "list")
@@ -185,8 +201,6 @@ def process_data(sheet):
     # Remove title from question list
     title = next(iter(question_dict))
     question_dict.pop(title)
-
-    # print(df.columns)
 
     # Adding the other option to the selected option here for simplicity. Will fix this with a catch all questiion in the future
     # Potential downside: answers without an other have a blank space afterwards now
@@ -386,9 +400,7 @@ def process_data(sheet):
 
     df = df[column_order]
 
-    export_to_sheet(df)
-
-    return
+    return df
 
 if __name__ == '__main__':
     main()
